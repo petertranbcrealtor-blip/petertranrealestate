@@ -69,6 +69,8 @@ export default async function handler(req, res) {
     }
 
     // Email notification — sends you an alert the moment a new lead comes in
+    console.log('Email env check — RESEND_API_KEY present:', !!process.env.RESEND_API_KEY, '| NOTIFY_TO_EMAIL present:', !!process.env.NOTIFY_TO_EMAIL);
+
     if (process.env.RESEND_API_KEY && process.env.NOTIFY_TO_EMAIL) {
       const detailLines = Object.entries(details)
         .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0; color:#5B6B70;">${k}</td><td style="padding:4px 0;">${v}</td></tr>`)
@@ -86,19 +88,27 @@ export default async function handler(req, res) {
           ${message ? `<p><strong>Message:</strong><br>${message}</p>` : ''}
         </div>`;
 
-      fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        },
-        body: JSON.stringify({
-          from: 'Peter Tran Real Estate <onboarding@resend.dev>',
-          to: process.env.NOTIFY_TO_EMAIL,
-          subject: `New lead: ${name} (${source || 'website'})`,
-          html: emailHtml,
-        }),
-      }).catch((e) => console.error('Email notification failed', e));
+      try {
+        const emailResp = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: 'Peter Tran Real Estate <onboarding@resend.dev>',
+            to: process.env.NOTIFY_TO_EMAIL,
+            subject: `New lead: ${name} (${source || 'website'})`,
+            html: emailHtml,
+          }),
+        });
+        const emailResult = await emailResp.text();
+        console.log('Resend response status:', emailResp.status, '| body:', emailResult);
+      } catch (emailErr) {
+        console.error('Email notification threw an error:', emailErr);
+      }
+    } else {
+      console.warn('Skipping email notification — RESEND_API_KEY or NOTIFY_TO_EMAIL not set.');
     }
 
     return res.status(200).json({ ok: true });
