@@ -179,6 +179,18 @@ section{ padding:88px 0; }
 }
 @media (max-width: 880px){ .footer-grid{ grid-template-columns:1fr 1fr; } }
 
+/* Social icons */
+.social-links{ display:flex; gap:14px; margin-top:18px; }
+.social-links a{
+  display:flex; align-items:center; justify-content:center;
+  width:36px; height:36px; border-radius:50%;
+  border:1px solid rgba(243,245,241,.25);
+  color:rgba(243,245,241,.75);
+  transition:all .18s ease;
+}
+.social-links a:hover{ background:var(--brass); border-color:var(--brass); color:var(--white); }
+.social-links svg{ width:16px; height:16px; fill:currentColor; }
+
 /* Forms */
 .field{ margin-bottom:16px; }
 .field label{ display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:var(--ink); }
