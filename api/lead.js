@@ -6,8 +6,9 @@
 //   SUPABASE_URL              e.g. https://xxxx.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY the "service_role" secret key from Supabase project settings > API
 //
-// Optional: set NOTIFY_EMAIL_WEBHOOK to any webhook URL (e.g. a Zapier/Make webhook, or a
-// Resend/SendGrid endpoint) if you want an email/SMS alert whenever a new lead comes in.
+// Optional — email notification on every new lead (via Resend, resend.com, free tier):
+//   RESEND_API_KEY            your Resend API key
+//   NOTIFY_TO_EMAIL           the address that should receive lead alerts, e.g. petertran.bcrealtor@gmail.com
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -67,13 +68,37 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: 'Could not save lead.' });
     }
 
-    // Optional: fire a notification webhook so you know immediately when a lead comes in
-    if (process.env.NOTIFY_EMAIL_WEBHOOK) {
-      fetch(process.env.NOTIFY_EMAIL_WEBHOOK, {
+    // Email notification — sends you an alert the moment a new lead comes in
+    if (process.env.RESEND_API_KEY && process.env.NOTIFY_TO_EMAIL) {
+      const detailLines = Object.entries(details)
+        .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0; color:#5B6B70;">${k}</td><td style="padding:4px 0;">${v}</td></tr>`)
+        .join('');
+
+      const emailHtml = `
+        <div style="font-family:Arial,sans-serif; max-width:520px;">
+          <h2 style="margin-bottom:4px;">New lead: ${name}</h2>
+          <p style="color:#5B6B70; margin-top:0;">Source: ${source || 'unknown'}${page ? ' · ' + page : ''}</p>
+          <table style="border-collapse:collapse; margin:16px 0;">
+            <tr><td style="padding:4px 12px 4px 0; color:#5B6B70;">Email</td><td style="padding:4px 0;">${email}</td></tr>
+            ${phone ? `<tr><td style="padding:4px 12px 4px 0; color:#5B6B70;">Phone</td><td style="padding:4px 0;">${phone}</td></tr>` : ''}
+            ${detailLines}
+          </table>
+          ${message ? `<p><strong>Message:</strong><br>${message}</p>` : ''}
+        </div>`;
+
+      fetch('https://api.resend.com/emails', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: `New lead: ${name} (${email}) — ${source}` }),
-      }).catch((e) => console.error('Notify webhook failed', e));
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        },
+        body: JSON.stringify({
+          from: 'Peter Tran Real Estate <onboarding@resend.dev>',
+          to: process.env.NOTIFY_TO_EMAIL,
+          subject: `New lead: ${name} (${source || 'website'})`,
+          html: emailHtml,
+        }),
+      }).catch((e) => console.error('Email notification failed', e));
     }
 
     return res.status(200).json({ ok: true });

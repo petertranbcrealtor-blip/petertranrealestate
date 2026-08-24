@@ -54,7 +54,8 @@ git push -u origin main
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `ADMIN_TOKEN` — make up a long random password, e.g. generate one at random.org
-   - `NOTIFY_EMAIL_WEBHOOK` — optional, leave blank for now
+   - `RESEND_API_KEY` — optional, enables email alerts on new leads (see below)
+   - `NOTIFY_TO_EMAIL` — optional, e.g. petertran.bcrealtor@gmail.com
 4. Deploy. Vercel gives you a `*.vercel.app` URL to test everything before pointing your domain at it.
 
 ## 5. Point your domain at it
