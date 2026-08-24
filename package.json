@@ -1,0 +1,6 @@
+{
+  "name": "peter-tran-real-estate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static site + serverless lead/CRM API for petertranrealestate.com"
+}

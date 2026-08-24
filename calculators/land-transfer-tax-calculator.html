@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BC Property Transfer Tax Calculator | Peter Tran Real Estate</title>
+<meta name="description" content="Calculate BC Property Transfer Tax (Land Transfer Tax) including First-Time Home Buyer and Newly Built Home exemptions.">
+<link rel="canonical" href="https://www.petertranrealestate.com/calculators/land-transfer-tax-calculator.html">
+<link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="../index.html"><img src="../assets/img/logo.png" alt="Peter Tran Real Estate" class="brand-logo"></a>
+    <nav class="nav-links" id="navLinks">
+      <a href="../buy.html">Buy</a>
+      <a href="../sell.html">Sell</a>
+      <a href="index.html">Calculators</a>
+      <a href="../blog/index.html">Market Insights</a>
+      <a href="../about.html">About</a>
+      <a href="../contact.html">Contact</a>
+    </nav>
+    <div class="nav-cta">
+      <span class="nav-phone">(604) 838-2407</span>
+      <a class="btn btn-brass" href="../sell.html">Get My Home Value</a>
+      <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="navLinks">Menu</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="section-tight" style="padding-top:56px;">
+    <div class="container">
+      <p class="eyebrow"><a href="index.html" style="color:inherit;">Calculators</a> / BC Property Transfer Tax</p>
+      <h1 style="font-size:clamp(30px,4vw,44px);">BC Property Transfer Tax Calculator</h1>
+      <p style="max-width:56ch;">Estimate the Property Transfer Tax (PTT) — commonly called land transfer tax — due on a BC property purchase, including common exemptions.</p>
+    </div>
+  </section>
+  <section class="section-tight" style="padding-top:0;">
+    <div class="container grid-2" style="align-items:start;">
+      <form class="card" onsubmit="return false;">
+        <div class="field"><label for="lPrice">Purchase price (CAD)</label><input type="number" id="lPrice" value="899000" min="0" step="1000"></div>
+        <div class="field" style="display:flex; align-items:center; gap:10px;">
+          <input type="checkbox" id="lFtb" style="width:auto;">
+          <label for="lFtb" style="margin:0;">I qualify as a First-Time Home Buyer</label>
+        </div>
+        <div class="field" style="display:flex; align-items:center; gap:10px;">
+          <input type="checkbox" id="lNewHome" style="width:auto;">
+          <label for="lNewHome" style="margin:0;">This is a newly built home</label>
+        </div>
+        <p class="form-note">Check whichever applies — the calculator applies the stronger exemption automatically. Only one exemption can apply per purchase.</p>
+      </form>
+      <div class="card" style="background:var(--ink); color:var(--paper); border:none;">
+        <p class="eyebrow" style="color:rgba(243,245,241,.7);">Property Transfer Tax due</p>
+        <div class="stat-num" id="lNet" style="font-size:44px; color:var(--paper);">$0</div>
+        <div style="margin-top:28px; display:grid; gap:14px;">
+          <div style="display:flex; justify-content:space-between; border-top:1px solid rgba(243,245,241,.15); padding-top:12px;">
+            <span style="color:rgba(243,245,241,.7); font-size:14px;">Base PTT (before exemptions)</span><span class="mono" id="lTax">$0</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:rgba(243,245,241,.7); font-size:14px;">Exemption applied</span><span class="mono" id="lExemption">$0</span>
+          </div>
+        </div>
+        <p class="form-note" id="lNote" style="color:rgba(243,245,241,.6); margin-top:16px;"></p>
+        <a class="btn btn-outline-light" href="../buy.html" style="margin-top:12px; width:100%; justify-content:center;">See Homes In Your Range</a>
+      </div>
+    </div>
+  </section>
+  <section class="section-tight" style="padding-top:0;">
+    <div class="container" style="max-width:820px;">
+      <h2 style="font-size:22px;">How BC Property Transfer Tax is calculated</h2>
+      <p>BC's Property Transfer Tax is charged on a marginal bracket system: 1% on the first $200,000, 2% on the portion between $200,000 and $2,000,000, 3% on the portion between $2,000,000 and $3,000,000, and 5% on anything above $3,000,000. First-Time Home Buyers and buyers of newly built homes may qualify for a full or partial exemption below certain price thresholds. Thresholds and rules are set by the BC government and can change — this calculator is a planning estimate; always confirm exact figures with your notary or lawyer at completion.</p>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div><div class="brand" style="margin-bottom:12px;"><img src="../assets/img/logo.png" alt="Peter Tran Real Estate" class="brand-logo brand-logo-footer"></div><p style="color:rgba(243,245,241,.6); max-width:34ch;">Real Broker Agent, License ID 192379. Serving Langley, Surrey, Abbotsford, Maple Ridge, Cloverdale and the Fraser Valley.</p></div>
+    <div><h4>Site</h4><a href="../buy.html">Buy</a><a href="../sell.html">Sell</a><a href="index.html">Calculators</a><a href="../blog/index.html">Market Insights</a></div>
+    <div><h4>Areas</h4><a href="../buy.html">Langley</a><a href="../buy.html">Surrey</a><a href="../buy.html">Abbotsford</a><a href="../buy.html">Maple Ridge</a><a href="../buy.html">Cloverdale</a></div>
+    <div><h4>Contact</h4><a href="tel:+16048382407">(604) 838-2407</a><a href="mailto:peter@petertranrealestate.com">peter@petertranrealestate.com</a><a href="../about.html">200-7404 King George Blvd, Surrey BC</a></div>
+  </div>
+  <div class="container footer-bottom"><span>© <span id="year"></span> Peter Tran — Real Broker. All rights reserved.</span></div>
+</footer>
+<script src="../js/main.js"></script>
+<script src="../js/calculators.js"></script>
+<script>initLTTCalculator();</script>
+</body>
+</html>
