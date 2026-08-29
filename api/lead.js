@@ -6,9 +6,17 @@
 //   SUPABASE_URL              e.g. https://xxxx.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY the "service_role" secret key from Supabase project settings > API
 //
-// Optional — email notification on every new lead (via Resend, resend.com, free tier):
+// Optional — email notification to YOU on every new lead (via Resend, resend.com, free tier):
 //   RESEND_API_KEY            your Resend API key
 //   NOTIFY_TO_EMAIL           the address that should receive lead alerts, e.g. petertran.bcrealtor@gmail.com
+//
+// Optional — auto-reply email sent to the LEAD confirming receipt:
+//   AUTOREPLY_FROM_EMAIL      e.g. Peter Tran <peter@petertranrealestate.com>
+//                             REQUIRES a verified domain in Resend (Resend > Domains > Add Domain,
+//                             then add the DNS records they give you). The free onboarding@resend.dev
+//                             sender can only email your own Resend signup address, not real leads —
+//                             so this feature silently does nothing until a domain is verified.
+//                             Leave this unset to skip the auto-reply entirely.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -109,6 +117,37 @@ export default async function handler(req, res) {
       }
     } else {
       console.warn('Skipping email notification — RESEND_API_KEY or NOTIFY_TO_EMAIL not set.');
+    }
+
+    // Auto-reply to the LEAD — only fires once a verified sending domain is configured
+    if (process.env.RESEND_API_KEY && process.env.AUTOREPLY_FROM_EMAIL) {
+      const replyHtml = `
+        <div style="font-family:Arial,sans-serif; max-width:520px;">
+          <p>Hi ${name.split(' ')[0]},</p>
+          <p>Thanks for reaching out — I've received your message and will follow up personally, usually within a business day.</p>
+          <p>In the meantime, feel free to browse the <a href="https://www.petertranrealestate.com/calculators/index.html">calculators</a> on the site, or reply directly to this email with any questions.</p>
+          <p>Talk soon,<br>Peter Tran<br>Real Broker · (604) 838-2407</p>
+        </div>`;
+
+      try {
+        const replyResp = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+          },
+          body: JSON.stringify({
+            from: process.env.AUTOREPLY_FROM_EMAIL,
+            to: email,
+            subject: "Thanks for reaching out — I'll be in touch shortly",
+            html: replyHtml,
+          }),
+        });
+        const replyResult = await replyResp.text();
+        console.log('Auto-reply status:', replyResp.status, '| body:', replyResult);
+      } catch (replyErr) {
+        console.error('Auto-reply email threw an error:', replyErr);
+      }
     }
 
     return res.status(200).json({ ok: true });

@@ -1,6 +1,6 @@
 // PATCH /api/lead-status
-// Body: { id: 123, status: "contacted" }
-// Updates a lead's status. Protected by the same ADMIN_TOKEN as /api/leads.
+// Body: { id: 123, status: "contacted" } and/or { id: 123, notes: "called, left voicemail" }
+// Updates a lead's status and/or private notes. Protected by the same ADMIN_TOKEN as /api/leads.
 
 export default async function handler(req, res) {
   if (req.method !== 'PATCH') {
@@ -14,10 +14,14 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { id, status } = req.body || {};
-  if (!id || !status) {
-    return res.status(400).json({ error: 'id and status are required.' });
+  const { id, status, notes } = req.body || {};
+  if (!id || (status === undefined && notes === undefined)) {
+    return res.status(400).json({ error: 'id and at least one of status/notes are required.' });
   }
+
+  const update = {};
+  if (status !== undefined) update.status = status;
+  if (notes !== undefined) update.notes = notes;
 
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -34,7 +38,7 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${supabaseKey}`,
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(update),
     });
     if (!resp.ok) {
       const errText = await resp.text();
