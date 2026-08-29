@@ -63,6 +63,11 @@
         <p>The more specific this is, the better the shortlist. I check new listings daily against active buyer criteria.</p>
       </div>
       <form class="card" data-lead-source="buyer-criteria" style="background:var(--white);">
+        <div style="position:absolute; left:-9999px; top:-9999px;" aria-hidden="true">
+          <label for="website">Leave this field empty</label>
+          <input type="text" name="website" id="website" tabindex="-1" autocomplete="off">
+        </div>
+        <input type="hidden" name="form_loaded_at" class="form-loaded-at" value="">
         <div class="grid-2" style="gap:16px; grid-template-columns:1fr 1fr; margin-bottom:0;">
           <div class="field"><label for="area">Preferred area(s)</label><input type="text" id="area" name="area" placeholder="e.g. Willoughby, Langley"></div>
           <div class="field"><label for="type">Property type</label>

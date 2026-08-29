@@ -17,6 +17,14 @@
 //                             sender can only email your own Resend signup address, not real leads —
 //                             so this feature silently does nothing until a domain is verified.
 //                             Leave this unset to skip the auto-reply entirely.
+//
+// Spam protection (no signup required, always on):
+//   - Honeypot field "website": invisible to real visitors, bots often fill it in automatically.
+//   - Time trap "form_loaded_at": a real person takes at least a couple seconds to fill a form;
+//     a submission that arrives faster than MIN_FILL_TIME_MS is treated as a bot.
+//   Both cases return a normal-looking 200 response but silently skip saving anything —
+//   this avoids tipping off bots that they were blocked, which just makes them adapt.
+const MIN_FILL_TIME_MS = 2000;
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -32,9 +40,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Name and email are required.' });
     }
 
+    // Honeypot check — real visitors never see or fill this field
+    if (body.website && String(body.website).trim() !== '') {
+      console.log('Spam blocked — honeypot field was filled.');
+      return res.status(200).json({ ok: true });
+    }
+
+    // Time-trap check — reject submissions that arrive suspiciously fast
+    const loadedAt = parseInt(body.form_loaded_at, 10);
+    if (!loadedAt || isNaN(loadedAt) || Date.now() - loadedAt < MIN_FILL_TIME_MS) {
+      console.log('Spam blocked — submitted too quickly to be human.');
+      return res.status(200).json({ ok: true });
+    }
+
     // Collect any extra fields (interest, propertyType, budget, address, etc.)
     // into a JSON "details" column so every form on the site can reuse this one endpoint.
-    const knownKeys = ['name', 'email', 'phone', 'message', 'source', 'page'];
+    const knownKeys = ['name', 'email', 'phone', 'message', 'source', 'page', 'website', 'form_loaded_at'];
     const details = {};
     for (const key of Object.keys(body)) {
       if (!knownKeys.includes(key)) details[key] = body[key];

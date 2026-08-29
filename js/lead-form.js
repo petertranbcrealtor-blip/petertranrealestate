@@ -4,6 +4,12 @@
   const forms = document.querySelectorAll('form[data-lead-source]');
   forms.forEach(function(form){
     const status = form.querySelector('.form-status');
+
+    // Spam protection: stamp the moment this form became visible.
+    // The server checks that enough time passed before treating a submission as human.
+    const loadedAtField = form.querySelector('.form-loaded-at');
+    if(loadedAtField) loadedAtField.value = Date.now();
+
     form.addEventListener('submit', async function(e){
       e.preventDefault();
       const submitBtn = form.querySelector('button[type="submit"]');
