@@ -415,8 +415,17 @@
 
   let parsedRows = [];
 
-  // Minimal CSV parser — handles quoted fields, commas inside quotes, and "" escaped quotes.
-  function parseCsv(text){
+  // Detects whether the file is actually comma, tab, or semicolon separated —
+  // exports labeled ".csv" are sometimes really tab-separated underneath.
+  function detectDelimiter(text){
+    const firstLine = text.split(/\r?\n/)[0] || '';
+    const counts = { ',': (firstLine.match(/,/g) || []).length, '\t': (firstLine.match(/\t/g) || []).length, ';': (firstLine.match(/;/g) || []).length };
+    return Object.keys(counts).reduce((a, b) => counts[a] >= counts[b] ? a : b);
+  }
+
+  // Minimal CSV/TSV parser — handles quoted fields, delimiters inside quotes, and "" escaped quotes.
+  function parseCsv(text, delimiter){
+    delimiter = delimiter || ',';
     const rows = [];
     let row = [], field = '', inQuotes = false;
     for(let i = 0; i < text.length; i++){
@@ -427,7 +436,7 @@
         else { field += c; }
       } else {
         if(c === '"'){ inQuotes = true; }
-        else if(c === ','){ row.push(field); field = ''; }
+        else if(c === delimiter){ row.push(field); field = ''; }
         else if(c === '\n' || c === '\r'){
           if(c === '\r' && next === '\n') i++;
           row.push(field); field = '';
@@ -471,79 +480,91 @@
   csvFileInput.addEventListener('change', function(){
     const file = csvFileInput.files[0];
     if(!file) return;
+    importPreviewArea.innerHTML = '<p class="form-note">Reading file…</p>';
     const reader = new FileReader();
+
+    reader.onerror = function(){
+      importPreviewArea.innerHTML = '<p class="form-status show err">Could not read that file. Try re-saving it as CSV and uploading again.</p>';
+    };
+
     reader.onload = function(e){
-      let text = e.target.result;
-      // Excel-exported CSVs often start with a BOM character that silently breaks
-      // matching the first column header (e.g. "name" becomes invisible-char+"name").
-      if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
-      const rows = parseCsv(text);
-      if(rows.length < 2){
-        importPreviewArea.innerHTML = '<p class="form-status show err">This file has no data rows.</p>';
-        return;
-      }
-      const headers = rows[0].map(h => h.trim().toLowerCase());
-      const dataRows = rows.slice(1);
-
-      // Matches common alternate header names too, so exports from other CRMs
-      // (Lofty, Follow Up Boss, etc.) work without renaming columns first.
-      function findCol(aliases){
-        for(const a of aliases){
-          const i = headers.indexOf(a);
-          if(i > -1) return i;
+      try {
+        let text = e.target.result;
+        // Excel-exported CSVs often start with a BOM character that silently breaks
+        // matching the first column header (e.g. "name" becomes invisible-char+"name").
+        if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        const delimiter = detectDelimiter(text);
+        const rows = parseCsv(text, delimiter);
+        if(rows.length < 2){
+          importPreviewArea.innerHTML = '<p class="form-status show err">This file has no data rows.</p>';
+          return;
         }
-        return -1;
-      }
+        const headers = rows[0].map(h => h.trim().toLowerCase());
+        const dataRows = rows.slice(1);
 
-      const idx = {
-        name: findCol(['name', 'full name', 'lead name']),
-        firstName: findCol(['first name', 'firstname']),
-        lastName: findCol(['last name', 'lastname']),
-        email: findCol(['email', 'e-mail', 'primary email', 'email address']),
-        phone: findCol(['phone', 'primary phone', 'phone number', 'mobile', 'cell']),
-        source: findCol(['source', 'lead source']),
-        status: findCol(['status']),
-        message: findCol(['message', 'comments', 'description']),
-        notes: findCol(['notes', 'note', 'note 1', 'note1']),
-      };
-
-      const hasName = idx.name > -1 || idx.firstName > -1 || idx.lastName > -1;
-      if(!hasName || idx.email === -1){
-        importPreviewArea.innerHTML = '<p class="form-status show err">Couldn\'t find name and email columns. Check your header row — need either a "name" column, or "first name"/"last name", plus an email column.</p>';
-        return;
-      }
-
-      parsedRows = dataRows.map(r => {
-        let name = idx.name > -1 ? (r[idx.name] || '').trim() : '';
-        if(!name){
-          const first = idx.firstName > -1 ? (r[idx.firstName] || '').trim() : '';
-          const last = idx.lastName > -1 ? (r[idx.lastName] || '').trim() : '';
-          name = (first + ' ' + last).trim();
+        // Matches common alternate header names too, so exports from other CRMs
+        // (Lofty, Follow Up Boss, etc.) work without renaming columns first.
+        function findCol(aliases){
+          for(const a of aliases){
+            const i = headers.indexOf(a);
+            if(i > -1) return i;
+          }
+          return -1;
         }
-        return {
-        name: name,
-        email: idx.email > -1 ? (r[idx.email] || '').trim() : '',
-        phone: idx.phone > -1 ? (r[idx.phone] || '').trim() : '',
-        source: idx.source > -1 ? (r[idx.source] || '').trim() : 'csv-import',
-        status: idx.status > -1 ? (r[idx.status] || '').trim() : 'new',
-        message: idx.message > -1 ? (r[idx.message] || '').trim() : '',
-        notes: idx.notes > -1 ? (r[idx.notes] || '').trim() : '',
+
+        const idx = {
+          name: findCol(['name', 'full name', 'lead name']),
+          firstName: findCol(['first name', 'firstname']),
+          lastName: findCol(['last name', 'lastname']),
+          email: findCol(['email', 'e-mail', 'primary email', 'email address']),
+          phone: findCol(['phone', 'primary phone', 'phone number', 'mobile', 'cell']),
+          source: findCol(['source', 'lead source']),
+          status: findCol(['status']),
+          message: findCol(['message', 'comments', 'description']),
+          notes: findCol(['notes', 'note', 'note 1', 'note1']),
         };
-      }).filter(r => r.name || r.email);
 
-      const validCount = parsedRows.filter(r => r.name && r.email).length;
-      const invalidCount = parsedRows.length - validCount;
+        const hasName = idx.name > -1 || idx.firstName > -1 || idx.lastName > -1;
+        if(!hasName || idx.email === -1){
+          importPreviewArea.innerHTML = '<p class="form-status show err">Couldn\'t find name and email columns. Found headers: ' + escapeHtml(headers.join(', ')) + '</p>';
+          return;
+        }
 
-      let preview = `<p style="margin-bottom:10px;"><strong>${parsedRows.length}</strong> rows found — <strong style="color:var(--fir);">${validCount}</strong> look valid` +
-        (invalidCount ? `, <strong style="color:#93312B;">${invalidCount}</strong> missing name/email and will be skipped` : '') + '.</p>';
-      preview += '<div style="max-height:200px; overflow-y:auto; border:1px solid var(--line); border-radius:3px;"><table style="font-size:12.5px;"><thead><tr><th>Name</th><th>Email</th><th>Source</th></tr></thead><tbody>';
-      parsedRows.slice(0, 20).forEach(r => {
-        preview += `<tr><td>${r.name || '—'}</td><td>${r.email || '—'}</td><td>${r.source || '—'}</td></tr>`;
-      });
-      if(parsedRows.length > 20) preview += `<tr><td colspan="3" style="color:var(--slate);">…and ${parsedRows.length - 20} more</td></tr>`;
-      preview += '</tbody></table></div>';
-      importPreviewArea.innerHTML = preview;
-      importConfirmBtn.style.display = validCount ? 'flex' : 'none';
+        parsedRows = dataRows.map(r => {
+          let name = idx.name > -1 ? (r[idx.name] || '').trim() : '';
+          if(!name){
+            const first = idx.firstName > -1 ? (r[idx.firstName] || '').trim() : '';
+            const last = idx.lastName > -1 ? (r[idx.lastName] || '').trim() : '';
+            name = (first + ' ' + last).trim();
+          }
+          return {
+          name: name,
+          email: idx.email > -1 ? (r[idx.email] || '').trim() : '',
+          phone: idx.phone > -1 ? (r[idx.phone] || '').trim() : '',
+          source: idx.source > -1 ? (r[idx.source] || '').trim() : 'csv-import',
+          status: idx.status > -1 ? (r[idx.status] || '').trim() : 'new',
+          message: idx.message > -1 ? (r[idx.message] || '').trim() : '',
+          notes: idx.notes > -1 ? (r[idx.notes] || '').trim() : '',
+          };
+        }).filter(r => r.name || r.email);
+
+        const validCount = parsedRows.filter(r => r.name && r.email).length;
+        const invalidCount = parsedRows.length - validCount;
+
+        let preview = `<p style="margin-bottom:10px;"><strong>${parsedRows.length}</strong> rows found — <strong style="color:var(--fir);">${validCount}</strong> look valid` +
+          (invalidCount ? `, <strong style="color:#93312B;">${invalidCount}</strong> missing name/email and will be skipped` : '') + '.</p>';
+        preview += '<div style="max-height:200px; overflow-y:auto; border:1px solid var(--line); border-radius:3px;"><table style="font-size:12.5px;"><thead><tr><th>Name</th><th>Email</th><th>Source</th></tr></thead><tbody>';
+        parsedRows.slice(0, 20).forEach(r => {
+          preview += `<tr><td>${r.name || '—'}</td><td>${r.email || '—'}</td><td>${r.source || '—'}</td></tr>`;
+        });
+        if(parsedRows.length > 20) preview += `<tr><td colspan="3" style="color:var(--slate);">…and ${parsedRows.length - 20} more</td></tr>`;
+        preview += '</tbody></table></div>';
+        importPreviewArea.innerHTML = preview;
+        importConfirmBtn.style.display = validCount ? 'flex' : 'none';
+      } catch(err){
+        console.error('CSV parse error:', err);
+        importPreviewArea.innerHTML = '<p class="form-status show err">Something went wrong reading this file: ' + escapeHtml(err.message || String(err)) + '</p>';
+      }
     };
     reader.readAsText(file);
   });
