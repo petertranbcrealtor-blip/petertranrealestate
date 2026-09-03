@@ -127,7 +127,7 @@
     <div class="modal-box" style="max-width:560px;">
       <h2 style="font-size:20px; margin-bottom:4px;">Import Leads from CSV</h2>
       <p class="form-note" style="margin-bottom:12px;">
-        Expected columns (any order, case-insensitive): <strong>name, email</strong> (required), plus optional phone, source, status, message, notes.
+        Needs a name column (or separate "First Name"/"Last Name" columns) and an email column — also recognizes "Primary Email," "Primary Phone," etc. from common CRM exports. Optional: phone, source, status, message, notes.
         <a href="#" id="downloadTemplateLink" style="color:var(--brass-dark); font-weight:600;">Download a template</a>.
       </p>
       <div id="importPreviewArea"></div>
@@ -485,30 +485,51 @@
       const headers = rows[0].map(h => h.trim().toLowerCase());
       const dataRows = rows.slice(1);
 
+      // Matches common alternate header names too, so exports from other CRMs
+      // (Lofty, Follow Up Boss, etc.) work without renaming columns first.
+      function findCol(aliases){
+        for(const a of aliases){
+          const i = headers.indexOf(a);
+          if(i > -1) return i;
+        }
+        return -1;
+      }
+
       const idx = {
-        name: headers.indexOf('name'),
-        email: headers.indexOf('email'),
-        phone: headers.indexOf('phone'),
-        source: headers.indexOf('source'),
-        status: headers.indexOf('status'),
-        message: headers.indexOf('message'),
-        notes: headers.indexOf('notes'),
+        name: findCol(['name', 'full name', 'lead name']),
+        firstName: findCol(['first name', 'firstname']),
+        lastName: findCol(['last name', 'lastname']),
+        email: findCol(['email', 'e-mail', 'primary email', 'email address']),
+        phone: findCol(['phone', 'primary phone', 'phone number', 'mobile', 'cell']),
+        source: findCol(['source', 'lead source']),
+        status: findCol(['status']),
+        message: findCol(['message', 'comments', 'description']),
+        notes: findCol(['notes', 'note', 'note 1', 'note1']),
       };
 
-      if(idx.name === -1 || idx.email === -1){
-        importPreviewArea.innerHTML = '<p class="form-status show err">Couldn\'t find "name" and "email" columns. Check your header row against the template.</p>';
+      const hasName = idx.name > -1 || idx.firstName > -1 || idx.lastName > -1;
+      if(!hasName || idx.email === -1){
+        importPreviewArea.innerHTML = '<p class="form-status show err">Couldn\'t find name and email columns. Check your header row — need either a "name" column, or "first name"/"last name", plus an email column.</p>';
         return;
       }
 
-      parsedRows = dataRows.map(r => ({
-        name: idx.name > -1 ? (r[idx.name] || '').trim() : '',
+      parsedRows = dataRows.map(r => {
+        let name = idx.name > -1 ? (r[idx.name] || '').trim() : '';
+        if(!name){
+          const first = idx.firstName > -1 ? (r[idx.firstName] || '').trim() : '';
+          const last = idx.lastName > -1 ? (r[idx.lastName] || '').trim() : '';
+          name = (first + ' ' + last).trim();
+        }
+        return {
+        name: name,
         email: idx.email > -1 ? (r[idx.email] || '').trim() : '',
         phone: idx.phone > -1 ? (r[idx.phone] || '').trim() : '',
         source: idx.source > -1 ? (r[idx.source] || '').trim() : 'csv-import',
         status: idx.status > -1 ? (r[idx.status] || '').trim() : 'new',
         message: idx.message > -1 ? (r[idx.message] || '').trim() : '',
         notes: idx.notes > -1 ? (r[idx.notes] || '').trim() : '',
-      })).filter(r => r.name || r.email);
+        };
+      }).filter(r => r.name || r.email);
 
       const validCount = parsedRows.filter(r => r.name && r.email).length;
       const invalidCount = parsedRows.length - validCount;
