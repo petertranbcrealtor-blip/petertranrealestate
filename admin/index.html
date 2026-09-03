@@ -473,7 +473,11 @@
     if(!file) return;
     const reader = new FileReader();
     reader.onload = function(e){
-      const rows = parseCsv(e.target.result);
+      let text = e.target.result;
+      // Excel-exported CSVs often start with a BOM character that silently breaks
+      // matching the first column header (e.g. "name" becomes invisible-char+"name").
+      if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const rows = parseCsv(text);
       if(rows.length < 2){
         importPreviewArea.innerHTML = '<p class="form-status show err">This file has no data rows.</p>';
         return;
@@ -536,6 +540,9 @@
       if(!res.ok) throw new Error(data.error || 'Import failed');
       importStatusMsg.textContent = `Imported ${data.inserted} leads` + (data.skipped ? `, skipped ${data.skipped}.` : '.');
       importStatusMsg.className = 'form-status show ok';
+      searchInput.value = '';
+      statusFilter.value = '';
+      sourceFilter.value = '';
       loadLeads();
       setTimeout(closeImportModal, 1800);
     } catch(e){
