@@ -26,6 +26,12 @@
   .toolbar input[type="text"]{ min-width:220px; flex:1; }
   .save-indicator{ font-size:11px; color:var(--fir); opacity:0; transition:opacity .3s ease; margin-top:4px; }
   .save-indicator.show{ opacity:1; }
+  .modal-overlay{
+    display:none; position:fixed; inset:0; background:rgba(23,36,46,.55);
+    align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal-box{ background:var(--white); border-radius:var(--radius); padding:32px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; }
 </style>
 </head>
 <body>
@@ -43,6 +49,9 @@
       <h1 style="font-size:26px; margin:0;">Leads</h1>
       <div style="display:flex; gap:10px; align-items:center;">
         <span class="pill" id="leadCount">0 leads</span>
+        <button class="btn btn-brass" id="addLeadBtn">+ Add Lead</button>
+        <button class="btn btn-outline" id="importBtn">Import CSV</button>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
         <button class="btn btn-outline" id="exportBtn">Export CSV</button>
         <button class="btn btn-outline" id="refreshBtn">Refresh</button>
         <button class="btn btn-outline" id="logoutBtn">Log out</button>
@@ -77,6 +86,57 @@
     </div>
     <p class="form-status" id="loadErr"></p>
     <p class="form-note" id="emptyState" style="display:none; margin-top:20px;">No leads match your search/filter.</p>
+  </div>
+
+  <div class="modal-overlay" id="addLeadModal">
+    <div class="modal-box">
+      <h2 style="font-size:20px; margin-bottom:4px;">Add a Lead</h2>
+      <p class="form-note" style="margin-bottom:16px;">For leads from a call, open house, referral, or anywhere off the website.</p>
+      <div class="field"><label for="alName">Full name</label><input type="text" id="alName" required></div>
+      <div class="field"><label for="alEmail">Email</label><input type="email" id="alEmail" required></div>
+      <div class="field"><label for="alPhone">Phone</label><input type="tel" id="alPhone"></div>
+      <div class="field"><label for="alSource">Source</label>
+        <select id="alSource">
+          <option value="manual">Manual entry</option>
+          <option value="referral">Referral</option>
+          <option value="open-house">Open house</option>
+          <option value="cold-call">Cold call</option>
+          <option value="past-client">Past client</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="field"><label for="alStatus">Status</label>
+        <select id="alStatus">
+          <option value="new">New</option>
+          <option value="contacted">Contacted</option>
+          <option value="qualified">Qualified</option>
+          <option value="client">Client</option>
+          <option value="closed">Closed</option>
+          <option value="lost">Lost</option>
+        </select>
+      </div>
+      <div class="field"><label for="alMessage">Message / context</label><textarea id="alMessage" rows="3"></textarea></div>
+      <div class="field"><label for="alNotes">Notes</label><textarea id="alNotes" rows="2"></textarea></div>
+      <p class="form-status" id="alStatusMsg"></p>
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <button class="btn btn-primary" id="alSaveBtn" style="flex:1; justify-content:center;">Save Lead</button>
+        <button class="btn btn-outline" id="alCancelBtn">Cancel</button>
+      </div>
+    </div>
+  <div class="modal-overlay" id="importModal">
+    <div class="modal-box" style="max-width:560px;">
+      <h2 style="font-size:20px; margin-bottom:4px;">Import Leads from CSV</h2>
+      <p class="form-note" style="margin-bottom:12px;">
+        Expected columns (any order, case-insensitive): <strong>name, email</strong> (required), plus optional phone, source, status, message, notes.
+        <a href="#" id="downloadTemplateLink" style="color:var(--brass-dark); font-weight:600;">Download a template</a>.
+      </p>
+      <div id="importPreviewArea"></div>
+      <p class="form-status" id="importStatusMsg"></p>
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn btn-primary" id="importConfirmBtn" style="flex:1; justify-content:center; display:none;">Import These Leads</button>
+        <button class="btn btn-outline" id="importCancelBtn">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -285,7 +345,207 @@
   statusFilter.addEventListener('change', applyFilters);
   sourceFilter.addEventListener('change', applyFilters);
 
+  // Add Lead modal
+  const addLeadModal = document.getElementById('addLeadModal');
+  const addLeadBtn = document.getElementById('addLeadBtn');
+  const alCancelBtn = document.getElementById('alCancelBtn');
+  const alSaveBtn = document.getElementById('alSaveBtn');
+  const alStatusMsg = document.getElementById('alStatusMsg');
+  const alFields = ['alName','alEmail','alPhone','alSource','alStatus','alMessage','alNotes'].map(id => document.getElementById(id));
+
+  function openModal(){
+    addLeadModal.classList.add('open');
+    alStatusMsg.className = 'form-status';
+    alStatusMsg.textContent = '';
+  }
+  function closeModal(){
+    addLeadModal.classList.remove('open');
+    alFields.forEach(f => { if(f.tagName === 'SELECT') f.selectedIndex = 0; else f.value = ''; });
+  }
+  addLeadBtn.addEventListener('click', openModal);
+  alCancelBtn.addEventListener('click', closeModal);
+  addLeadModal.addEventListener('click', function(e){ if(e.target === addLeadModal) closeModal(); });
+
+  alSaveBtn.addEventListener('click', async function(){
+    const name = document.getElementById('alName').value.trim();
+    const email = document.getElementById('alEmail').value.trim();
+    if(!name || !email){
+      alStatusMsg.textContent = 'Name and email are required.';
+      alStatusMsg.className = 'form-status show err';
+      return;
+    }
+    alSaveBtn.disabled = true;
+    alSaveBtn.textContent = 'Saving…';
+    try {
+      const res = await fetch('/api/lead-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + getToken() },
+        body: JSON.stringify({
+          name, email,
+          phone: document.getElementById('alPhone').value.trim(),
+          source: document.getElementById('alSource').value,
+          status: document.getElementById('alStatus').value,
+          message: document.getElementById('alMessage').value.trim(),
+          notes: document.getElementById('alNotes').value.trim(),
+        })
+      });
+      if(!res.ok) throw new Error('Save failed');
+      closeModal();
+      loadLeads();
+    } catch(e){
+      alStatusMsg.textContent = 'Could not save this lead. Try again.';
+      alStatusMsg.className = 'form-status show err';
+    } finally {
+      alSaveBtn.disabled = false;
+      alSaveBtn.textContent = 'Save Lead';
+    }
+  });
+
   if(getToken()) showDashboard();
+
+  // ===== CSV Import =====
+  const importBtn = document.getElementById('importBtn');
+  const csvFileInput = document.getElementById('csvFileInput');
+  const importModal = document.getElementById('importModal');
+  const importPreviewArea = document.getElementById('importPreviewArea');
+  const importStatusMsg = document.getElementById('importStatusMsg');
+  const importConfirmBtn = document.getElementById('importConfirmBtn');
+  const importCancelBtn = document.getElementById('importCancelBtn');
+  const downloadTemplateLink = document.getElementById('downloadTemplateLink');
+
+  let parsedRows = [];
+
+  // Minimal CSV parser — handles quoted fields, commas inside quotes, and "" escaped quotes.
+  function parseCsv(text){
+    const rows = [];
+    let row = [], field = '', inQuotes = false;
+    for(let i = 0; i < text.length; i++){
+      const c = text[i], next = text[i+1];
+      if(inQuotes){
+        if(c === '"' && next === '"'){ field += '"'; i++; }
+        else if(c === '"'){ inQuotes = false; }
+        else { field += c; }
+      } else {
+        if(c === '"'){ inQuotes = true; }
+        else if(c === ','){ row.push(field); field = ''; }
+        else if(c === '\n' || c === '\r'){
+          if(c === '\r' && next === '\n') i++;
+          row.push(field); field = '';
+          if(row.some(v => v !== '')) rows.push(row);
+          row = [];
+        } else { field += c; }
+      }
+    }
+    if(field !== '' || row.length){ row.push(field); rows.push(row); }
+    return rows;
+  }
+
+  function openImportModal(){
+    importModal.classList.add('open');
+    importPreviewArea.innerHTML = '';
+    importStatusMsg.className = 'form-status';
+    importStatusMsg.textContent = '';
+    importConfirmBtn.style.display = 'none';
+    parsedRows = [];
+  }
+  function closeImportModal(){
+    importModal.classList.remove('open');
+    csvFileInput.value = '';
+  }
+
+  importBtn.addEventListener('click', function(){ openImportModal(); csvFileInput.click(); });
+  importCancelBtn.addEventListener('click', closeImportModal);
+  importModal.addEventListener('click', function(e){ if(e.target === importModal) closeImportModal(); });
+
+  downloadTemplateLink.addEventListener('click', function(e){
+    e.preventDefault();
+    const template = 'name,email,phone,source,status,message,notes\nJane Smith,jane@example.com,604-555-0100,referral,new,Interested in Willoughby townhomes,Met at open house\n';
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'leads-import-template.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  csvFileInput.addEventListener('change', function(){
+    const file = csvFileInput.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const rows = parseCsv(e.target.result);
+      if(rows.length < 2){
+        importPreviewArea.innerHTML = '<p class="form-status show err">This file has no data rows.</p>';
+        return;
+      }
+      const headers = rows[0].map(h => h.trim().toLowerCase());
+      const dataRows = rows.slice(1);
+
+      const idx = {
+        name: headers.indexOf('name'),
+        email: headers.indexOf('email'),
+        phone: headers.indexOf('phone'),
+        source: headers.indexOf('source'),
+        status: headers.indexOf('status'),
+        message: headers.indexOf('message'),
+        notes: headers.indexOf('notes'),
+      };
+
+      if(idx.name === -1 || idx.email === -1){
+        importPreviewArea.innerHTML = '<p class="form-status show err">Couldn\'t find "name" and "email" columns. Check your header row against the template.</p>';
+        return;
+      }
+
+      parsedRows = dataRows.map(r => ({
+        name: idx.name > -1 ? (r[idx.name] || '').trim() : '',
+        email: idx.email > -1 ? (r[idx.email] || '').trim() : '',
+        phone: idx.phone > -1 ? (r[idx.phone] || '').trim() : '',
+        source: idx.source > -1 ? (r[idx.source] || '').trim() : 'csv-import',
+        status: idx.status > -1 ? (r[idx.status] || '').trim() : 'new',
+        message: idx.message > -1 ? (r[idx.message] || '').trim() : '',
+        notes: idx.notes > -1 ? (r[idx.notes] || '').trim() : '',
+      })).filter(r => r.name || r.email);
+
+      const validCount = parsedRows.filter(r => r.name && r.email).length;
+      const invalidCount = parsedRows.length - validCount;
+
+      let preview = `<p style="margin-bottom:10px;"><strong>${parsedRows.length}</strong> rows found — <strong style="color:var(--fir);">${validCount}</strong> look valid` +
+        (invalidCount ? `, <strong style="color:#93312B;">${invalidCount}</strong> missing name/email and will be skipped` : '') + '.</p>';
+      preview += '<div style="max-height:200px; overflow-y:auto; border:1px solid var(--line); border-radius:3px;"><table style="font-size:12.5px;"><thead><tr><th>Name</th><th>Email</th><th>Source</th></tr></thead><tbody>';
+      parsedRows.slice(0, 20).forEach(r => {
+        preview += `<tr><td>${r.name || '—'}</td><td>${r.email || '—'}</td><td>${r.source || '—'}</td></tr>`;
+      });
+      if(parsedRows.length > 20) preview += `<tr><td colspan="3" style="color:var(--slate);">…and ${parsedRows.length - 20} more</td></tr>`;
+      preview += '</tbody></table></div>';
+      importPreviewArea.innerHTML = preview;
+      importConfirmBtn.style.display = validCount ? 'flex' : 'none';
+    };
+    reader.readAsText(file);
+  });
+
+  importConfirmBtn.addEventListener('click', async function(){
+    importConfirmBtn.disabled = true;
+    importConfirmBtn.textContent = 'Importing…';
+    try {
+      const res = await fetch('/api/lead-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + getToken() },
+        body: JSON.stringify({ leads: parsedRows })
+      });
+      const data = await res.json();
+      if(!res.ok) throw new Error(data.error || 'Import failed');
+      importStatusMsg.textContent = `Imported ${data.inserted} leads` + (data.skipped ? `, skipped ${data.skipped}.` : '.');
+      importStatusMsg.className = 'form-status show ok';
+      loadLeads();
+      setTimeout(closeImportModal, 1800);
+    } catch(e){
+      importStatusMsg.textContent = e.message || 'Import failed. Check your file and try again.';
+      importStatusMsg.className = 'form-status show err';
+    } finally {
+      importConfirmBtn.disabled = false;
+      importConfirmBtn.textContent = 'Import These Leads';
+    }
+  });
 })();
 </script>
 </body>
